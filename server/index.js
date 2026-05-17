@@ -93,18 +93,55 @@ app.get('/health', (req, res) =>
 );
 
 // ── Serve Static Frontend Files ──────────────────────────
-// ── Serve single Vite app ────────────────────────────────
+// // ── Serve single Vite app ────────────────────────────────
+// const appDist = path.join(__dirname, '../client/dist');
+// app.use(express.static(appDist));
+
+// // All non-API routes → React app (handles client-side routing)
+// app.get('*', (req, res) => {
+//   if (req.path.startsWith('/api')) {
+//     return res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found.` });
+//   }
+//   res.sendFile(path.join(appDist, 'index.html'));
+// });
+
+// ── API Root / Optional Frontend Fallback ─────────────────
 const appDist = path.join(__dirname, '../client/dist');
-app.use(express.static(appDist));
+const indexHtml = path.join(appDist, 'index.html');
 
-// All non-API routes → React app (handles client-side routing)
-app.get('*', (req, res) => {
-  if (req.path.startsWith('/api')) {
-    return res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found.` });
-  }
-  res.sendFile(path.join(appDist, 'index.html'));
-});
+if (fs.existsSync(indexHtml)) {
+  app.use(express.static(appDist));
 
+  app.get('*', (req, res) => {
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({
+        success: false,
+        message: `Route ${req.originalUrl} not found.`,
+      });
+    }
+
+    res.sendFile(indexHtml);
+  });
+} else {
+  app.get('/', (req, res) => {
+    res.json({
+      success: true,
+      message: 'BMS API running',
+      env: process.env.NODE_ENV,
+    });
+  });
+
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({
+        success: false,
+        message: `Route ${req.originalUrl} not found.`,
+      });
+    }
+
+    next();
+  });
+}
 
 
 // ── Global Error Handler ──────────────────────────────────
