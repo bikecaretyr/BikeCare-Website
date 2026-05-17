@@ -4,7 +4,7 @@ import type {
   ApprovalRequest, Employee, Notification, DashboardStats, RevenueReport, AuditLog
 } from '../types'
 
-const BASE = '/api'
+const BASE = import.meta.env.VITE_API_URL || '/api'
 
 // ── Token store ────────────────────────────────────────────
 let _token = ''
