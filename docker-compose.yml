@@ -1,0 +1,82 @@
+version: '3.9'
+
+services:
+  # ── MongoDB ────────────────────────────────────────────
+  mongo:
+    image: mongo:7.0
+    container_name: bms_mongo
+    restart: unless-stopped
+
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASS}
+
+    ports:
+      - "127.0.0.1:27017:27017"
+
+    volumes:
+      - mongo_data:/data/db
+      - mongo_config:/data/configdb
+      - ./mongo-init:/docker-entrypoint-initdb.d
+
+    networks:
+      - bms_net
+
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ── Node.js App ────────────────────────────────────────
+  app:
+    build: .
+    container_name: bms_app
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      MONGO_URI: mongodb://${MONGO_APP_USER}:${MONGO_APP_PASS}@mongo:27017/${MONGO_DB}?authSource=${MONGO_DB}
+      NODE_ENV: production
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - bms_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Nginx Reverse Proxy (optional but recommended) ────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: bms_nginx
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro       # place your SSL certs here
+      - nginx_logs:/var/log/nginx
+    networks:
+      - bms_net
+    profiles:
+      - with-nginx   # run with: docker compose --profile with-nginx up
+
+volumes:
+  mongo_data:
+  mongo_config:
+  nginx_logs:
+
+networks:
+  bms_net:
+    driver: bridge

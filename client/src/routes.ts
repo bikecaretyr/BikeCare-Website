@@ -1,0 +1,42 @@
+export const ROUTES = {
+  public: {
+    home: '/',
+  },
+  auth: {
+    login: '/login',
+    superAdmin: '/superadmin',
+  },
+  portal: {
+    dashboard: '/portal/dashboard',
+    newJob: '/portal/new-job',
+    bookings: '/portal/bookings',
+    jobs: '/portal/jobs',
+    parts: '/portal/parts',
+    requests: '/portal/requests',
+    profile: '/portal/profile',
+  },
+  admin: {
+    dashboard: '/admin/dashboard',
+    jobs: '/admin/jobs',
+    approvals: '/admin/approvals',
+    bookings: '/admin/bookings',
+    credits: '/admin/credits',
+    inventory: '/admin/inventory',
+    employees: '/admin/employees',
+    branches: '/admin/branches',
+    services: '/admin/services',
+    reports: '/admin/reports',
+    audit: '/admin/audit',
+    profile: '/admin/profile',
+  },
+  manager: {
+    dashboard: '/manager/dashboard',
+    jobs: '/manager/jobs',
+    approvals: '/manager/approvals',
+    bookings: '/manager/bookings',
+    inventory: '/manager/inventory',
+    employees: '/manager/employees',
+    reports: '/manager/reports',
+    profile: '/manager/profile',
+  },
+} as const

@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { scroll-behavior: smooth; }
+  html, body, #root { @apply h-full; }
+  body { @apply bg-[#090b10] text-gray-100 font-sans antialiased overflow-x-hidden; }
+}
+
+@layer components {
+  /* ── Inputs ── */
+  .input {
+    @apply w-full bg-surface-2 border border-border rounded-lg px-3 py-2.5
+           text-gray-100 text-sm outline-none font-sans
+           transition-all duration-200
+           focus:border-amber focus:ring-2 focus:ring-amber/10
+           placeholder:text-gray-600
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg
+           font-semibold text-sm transition-all duration-200
+           disabled:opacity-50 disabled:cursor-not-allowed font-sans;
+  }
+  .btn-primary  { @apply btn bg-amber text-black hover:bg-amber-dark active:scale-95; }
+  .btn-outline  { @apply btn border border-border text-gray-300 hover:border-amber hover:text-amber; }
+  .btn-danger   { @apply btn bg-red-500 text-white hover:bg-red-600; }
+  .btn-success  { @apply btn bg-green-500 text-white hover:bg-green-600; }
+  .btn-ghost    { @apply btn text-gray-400 hover:text-gray-100 hover:bg-surface-2; }
+
+  /* ── Cards ── */
+  .card         { @apply bg-surface border border-border rounded-xl; }
+  .card-header  { @apply px-4 py-3 border-b border-border flex items-center justify-between; }
+  .card-title   { @apply font-heading text-sm font-semibold text-gray-100; }
+
+  /* ── Badges ── */
+  .badge            { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap; }
+  .badge-received   { @apply badge bg-blue-500/10 text-blue-400; }
+  .badge-progress   { @apply badge bg-amber/10 text-amber; }
+  .badge-ready      { @apply badge bg-green-500/10 text-green-400; }
+  .badge-delivered  { @apply badge bg-green-400/10 text-green-300; }
+  .badge-cancelled  { @apply badge bg-red-500/10 text-red-400; }
+  .badge-pending    { @apply badge bg-amber/10 text-amber; }
+  .badge-approved   { @apply badge bg-green-500/10 text-green-400; }
+  .badge-rejected   { @apply badge bg-red-500/10 text-red-400; }
+  .badge-admin      { @apply badge bg-amber/10 text-amber; }
+  .badge-employee   { @apply badge bg-blue-500/10 text-blue-400; }
+
+  /* ── Typography ── */
+  .page-title   { @apply font-heading text-xl font-bold text-gray-100 mb-4; }
+  .section-tag  { @apply text-xs font-semibold uppercase tracking-widest text-amber mb-2; }
+  .section-title { @apply font-heading text-3xl md:text-4xl font-bold leading-tight mb-3; }
+  .form-label   { @apply text-xs font-semibold uppercase tracking-widest text-gray-500 block mb-1; }
+
+  /* ── Stat cards ── */
+  .stat-card { @apply card p-4 text-center; }
+  .stat-val  { @apply font-heading text-3xl font-bold; }
+  .stat-lbl  { @apply text-xs text-gray-500 uppercase tracking-widest mt-1; }
+}
+
+@layer utilities {
+  .hide-mobile  { @apply hidden sm:block; }
+  .show-mobile  { @apply block sm:hidden; }
+}
