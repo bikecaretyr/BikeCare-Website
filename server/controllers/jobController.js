@@ -338,12 +338,13 @@ exports.addPayment = asyncHandler(async (req, res) => {
 
   const amount = Number(req.body.amount);
   const { mode, note } = req.body;
+  const allowedModes = ['Cash', 'UPI', 'Card', 'Credit']
 
   if (!amount || amount <= 0) {
     throw new AppError('Valid payment amount required.', 400);
   }
 
-  if (!['Cash', 'UPI', 'Card'].includes(mode)) {
+  if (!allowedModes.includes(mode)) {
     throw new AppError('Valid collection mode required.', 400);
   }
 

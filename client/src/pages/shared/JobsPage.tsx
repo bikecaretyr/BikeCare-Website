@@ -62,28 +62,36 @@ export function JobsPage({ basePath, title, showBranch }: JobsPageProps) {
   const [intakeJob, setIntakeJob] = useState<JobCard | null>(null)
   const [paymentJob, setPaymentJob] = useState<JobCard | null>(null)
   const [collectAmount, setCollectAmount] = useState('')
-  const [collectMode, setCollectMode] = useState<'Cash' | 'UPI' | 'Card'>('Cash')
+  const [collectMode, setCollectMode] = useState<'Cash' | 'UPI' | 'Card' | 'Credit'>('Cash')
   const canAddSpares = modal !== 'new'
   const { form, setForm, set, reset, saving, setSaving } = useForm<JobForm>(emptyForm)
   const { user } = useAuth()
 
-  function openCollectPayment(job: JobCard) {
+  function openPayment(job: JobCard) {
     setPaymentJob(job)
-    setCollectAmount(String(job.balanceAmount ?? 0))
     setCollectMode('Cash')
+    setCollectAmount(String(job.balanceAmount && job.balanceAmount > 0 ? job.balanceAmount : job.totalAmount || 0))
   }
 
   async function collectPayment() {
     if (!paymentJob) return
 
-    const amount = +collectAmount || 0
+    const total = paymentJob.totalAmount ?? 0
+    const alreadyPaid = paymentJob.paidAmount ?? 0
+    const balance = paymentJob.balanceAmount && paymentJob.balanceAmount > 0
+      ? paymentJob.balanceAmount
+      : Math.max(0, total - alreadyPaid)
 
-    if (amount <= 0) {
+    const amount = collectMode === 'Credit'
+      ? (+collectAmount || 0)
+      : balance
+
+    if (amount < 0) {
       toast('Enter valid amount', 'error')
       return
     }
 
-    if (amount > (paymentJob.balanceAmount ?? 0)) {
+    if (amount > balance) {
       toast('Amount cannot exceed balance', 'error')
       return
     }
@@ -92,10 +100,12 @@ export function JobsPage({ basePath, title, showBranch }: JobsPageProps) {
       await jobsApi.addPayment(paymentJob._id, {
         amount,
         mode: collectMode,
-        note: 'Credit balance collected',
+        note: collectMode === 'Credit'
+          ? 'Bill settled as credit'
+          : 'Payment collected',
       })
 
-      toast('Payment collected', 'success')
+      toast('Payment updated', 'success')
       setPaymentJob(null)
       setCollectAmount('')
       await reloadJobs()
@@ -221,11 +231,6 @@ export function JobsPage({ basePath, title, showBranch }: JobsPageProps) {
         sparesTotal -
         (+form.discount || 0)
 
-      const isCredit = form.paymentMode === 'Credit'
-      const paidAmount = isCredit
-        ? (+form.paidAmount || 0)
-        : total
-
       const {
         paymentStatus,
         paidAmount: _paidAmount,
@@ -242,32 +247,10 @@ export function JobsPage({ basePath, title, showBranch }: JobsPageProps) {
         sparesCost: sparesTotal,
         totalAmount: total,
         sparesUsed: spares,
-        ...(modal === 'new' && paidAmount > 0 ? {
-          paymentHistory: [{
-            amount: paidAmount,
-            mode: form.paymentMode,
-            paidAt: new Date().toISOString(),
-            note: isCredit ? 'Initial credit payment' : 'Full payment',
-          }]
-        } : {}),
       }
       if (modal && modal !== 'new') {
         const jobId = (modal as JobCard)._id
         await jobsApi.update(jobId, body)
-
-        if (form.paymentMode === 'Credit') {
-          const oldPaid = (modal as JobCard).paidAmount ?? 0
-          const newPaid = +form.paidAmount || 0
-          const extraPaid = newPaid - oldPaid
-
-          if (extraPaid > 0) {
-            await jobsApi.addPayment(jobId, {
-              amount: extraPaid,
-              mode: 'Credit',
-              note: 'Credit payment collected',
-            })
-          }
-        }
 
         toast('Job updated', 'success')
       } else {
@@ -382,12 +365,12 @@ export function JobsPage({ basePath, title, showBranch }: JobsPageProps) {
                             : '→ Deliver'}
                       </button>
                     )}
-                    {job.paymentMode === 'Credit' && (job.balanceAmount ?? 0) > 0 && (
+                    {job.status !== 'Cancelled' && (job.paymentStatus !== 'Paid') && (
                       <button
                         className="btn-success px-2 py-1 text-xs"
-                        onClick={() => openCollectPayment(job)}
+                        onClick={() => openPayment(job)}
                       >
-                        Collect ₹
+                        💰 Payment
                       </button>
                     )}
                   </div>
@@ -620,17 +603,19 @@ export function JobsPage({ basePath, title, showBranch }: JobsPageProps) {
               />
             </Field>
 
-            <Field label="Mode">
+            <Field label="Payment Mode">
               <select
                 className="input"
                 value={collectMode}
-                onChange={e => setCollectMode(e.target.value as 'Cash' | 'UPI' | 'Card')}
+                onChange={e => setCollectMode(e.target.value as 'Cash' | 'UPI' | 'Card' | 'Credit')}
               >
                 <option value="Cash">Cash</option>
                 <option value="UPI">UPI</option>
                 <option value="Card">Card</option>
+                <option value="Credit">Credit</option>
               </select>
             </Field>
+            
           </FormGrid>
 
           <FormActions>
