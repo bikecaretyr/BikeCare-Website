@@ -149,39 +149,25 @@ app.use(errorHandler);
 
 // ── Start Server ─────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-// const { Server } = require('socket.io')
 const server = app.listen(PORT, () => { 
   logger.info(`🚀 BMS Server running on port ${PORT} [${process.env.NODE_ENV}]`);
   logger.info(`📍 Public site:    http://localhost:${PORT}`);
   logger.info(`🔧 Employee portal: http://localhost:${PORT}/portal`);
   logger.info(`🔐 Admin panel:    http://localhost:${PORT}/admin`);
   logger.info(`⚡ SuperAdmin:     http://localhost:${PORT}/superadmin`);
- })
-// const io = new Server(server, {
-//   cors: { origin: process.env.CLIENT_URL, credentials: true }
-// })
+ });
 
-// // Make io available everywhere
-// app.set('io', io)
-
-// io.on('connection', (socket) => {
-//   // Client joins their branch room
-//   socket.on('join', ({ branchId, role }) => {
-//     socket.join(role === 'admin' || role === 'superadmin' ? 'admins' : `branch:${branchId}`)
-//   })
-// })
-
-// // ── Graceful Shutdown ─────────────────────────────────────
-// process.on('SIGTERM', () => {
-//   logger.info('SIGTERM received. Shutting down gracefully...');
-//   server.close(() => {
-//     logger.info('HTTP server closed.');
-//     process.exit(0);
-//   });
-// });
-// process.on('unhandledRejection', (err) => {
-//   logger.error(`UNHANDLED REJECTION: ${err.message}`);
-//   server.close(() => process.exit(1));
-// });
+// ── Graceful Shutdown ─────────────────────────────────────
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received. Shutting down gracefully...');
+  server.close(() => {
+    logger.info('HTTP server closed.');
+    process.exit(0);
+  });
+});
+process.on('unhandledRejection', (err) => {
+  logger.error(`UNHANDLED REJECTION: ${err.message}`);
+  server.close(() => process.exit(1));
+});
 
 module.exports = app;
