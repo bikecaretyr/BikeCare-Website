@@ -805,7 +805,6 @@ bms/
 
 ## Planned Features
 
-* Socket.IO realtime updates
 * React Query integration
 * Branch selector tabs
 * PWA support

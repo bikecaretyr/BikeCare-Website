@@ -18,8 +18,15 @@ const { errorHandler } = require('./middleware/errorHandler');
 const { globalLimiter } = require('./middleware/rateLimiter');
 
 // ── Ensure logs directory ────────────────────────────────
+// In serverless environments (e.g. Vercel at /var/task), the working
+// directory may be read-only. We try to create the logs/ folder but
+// silently fall back to console-only logging if it fails.
 const logsDir = path.join(__dirname, '../logs');
-if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+try {
+  if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+} catch (err) {
+  console.warn(`Could not create logs directory at ${logsDir}: ${err.message}`);
+}
 
 // ── Connect DB ───────────────────────────────────────────
 connectDB();
