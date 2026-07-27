@@ -71,7 +71,6 @@
 | express-validator | ^7.0.1 | Input validation |
 | Nodemailer | ^8.0.3 | Email (Gmail SMTP) |
 | Winston | ^3.11.0 | Logging |
-| Socket.IO | ^4.8.3 | Realtime (server-side, currently commented out) |
 | Multer | ^1.4.5-lts.1 | File uploads |
 | Morgan | ^1.10.0 | HTTP logging |
 | Compression | ^1.7.4 | Response compression |
@@ -92,7 +91,6 @@
 | TypeScript | ^5.3.3 | Type safety |
 | Vite | ^5.1.0 | Build tool / dev server |
 | Tailwind CSS | ^3.4.1 | Styling |
-| socket.io-client | ^4.8.3 | Realtime client (connected but server-side commented out) |
 
 ### Infrastructure
 
@@ -179,7 +177,6 @@ bms/
 │       ├── App.tsx               # Root component with route guards
 │       ├── main.tsx              # React entry point
 │       ├── routes.ts             # Route path constants
-│       ├── socket.ts             # Socket.IO client setup
 │       ├── types.ts              # All TypeScript interfaces
 │       ├── index.css             # Tailwind imports + global styles
 │       ├── css.d.ts              # CSS module type declaration
@@ -1118,8 +1115,6 @@ All routes are prefixed with `/api`. Response shape: `{ success, ...payload }`.
 
 **Nginx (`nginx.conf`):**
 - Reverse proxy to `app:5000`
-- WebSocket upgrade support
-- Rate limiting: `limit_req_zone` at 10r/s with burst of 20
 - `client_max_body_size 10m`
 - HTTPS block (commented — enable after certbot)
 
@@ -1289,13 +1284,7 @@ stockValue = totalStock × avg(active batches' sellingPrice)
 
 ## 17. Known Issues & Notes
 
-### Socket.IO
-
-- Socket.IO server-side code is **commented out** in `server/index.js`
-- Client `socket.ts` exists but realtime is not active
-- Listed in future roadmap
-
-### Route Registration Bug
+### Route Registration
 
 - In `server/routes/index.js`, the `vendors`, `purchases`, and `vehicle-lookup` routes are registered **after** `module.exports = router` (lines 104-119)
 - These routes may not be properly registered — verify they work as expected
@@ -1331,13 +1320,11 @@ stockValue = totalStock × avg(active batches' sellingPrice)
 
 Per README:
 
-- [ ] Socket.IO realtime updates
 - [ ] React Query integration
 - [ ] Branch selector tabs
 - [ ] PWA support
 - [ ] SMS integration
 - [ ] Automated backups
-- [ ] Full invoice printing
 - [ ] Advanced analytics
 - [ ] Customer billing portal
 - [ ] Live notifications

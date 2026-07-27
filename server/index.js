@@ -54,7 +54,12 @@ app.use(
 // ── CORS ─────────────────────────────────────────────────
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5000',
+    origin: [
+    "https://bikecaretyr.in",
+    "https://www.bikecaretyr.in",
+    'http://localhost:5000',
+    process.env.CLIENT_URL
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
