@@ -1,9 +1,27 @@
 import { useEffect, useState } from 'react'
 import type { JobCard, SpareItem } from '../types'
 
+interface InvoiceSaveData {
+  labourCharge: number
+  waterWash: number
+  discount: number
+  paymentMode: string
+  workDone: string
+  sparesUsed: Array<{
+    partId?: string
+    partNumber: string
+    partName: string
+    vendorBatchId?: string
+    vendorName: string
+    qty: number
+    sellingPrice: number
+  }>
+}
+
 interface JobInvoiceProps {
   job: JobCard
   onClose: () => void
+  onSave?: (data: InvoiceSaveData) => Promise<void>
 }
 
 interface LabourRow {
@@ -30,7 +48,7 @@ function safeNumber(value: string | number | undefined) {
   return Number.isFinite(n) ? n : 0
 }
 
-export function JobInvoice({ job, onClose }: JobInvoiceProps) {
+export function JobInvoice({ job, onClose, onSave }: JobInvoiceProps) {
   const [labourRows, setLabourRows] = useState<LabourRow[]>([
     { id: '1', description: 'Labour Charge', amount: job.labourCharge },
     { id: '2', description: 'Water Wash', amount: job.waterWash },
@@ -48,6 +66,8 @@ export function JobInvoice({ job, onClose }: JobInvoiceProps) {
   const [discount, setDiscount] = useState<number>(job.discount)
   const [paymentMode, setPaymentMode] = useState(job.paymentMode)
   const [workDone, setWorkDone] = useState(job.workDone || '')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   useEffect(() => {
     setLabourRows([
@@ -109,6 +129,49 @@ export function JobInvoice({ job, onClose }: JobInvoiceProps) {
       id: `${Date.now()}-${rows.length}`,
       partNumber: '', partName: '', vendorName: '', qty: 1, unitPrice: 0,
     }])
+  }
+
+  const handleSave = async () => {
+    if (!onSave) return
+    setSaving(true)
+    setSaveError('')
+    try {
+      const labourCharge = labourRows
+        .filter(row => row.description !== 'Water Wash')
+        .reduce((sum, row) => sum + safeNumber(row.amount), 0)
+      const waterWash = labourRows
+        .filter(row => row.description === 'Water Wash')
+        .reduce((sum, row) => sum + safeNumber(row.amount), 0)
+
+      const originalSpares = job.sparesUsed ?? []
+      const sparesUsed = partRows
+        .filter(row => row.partName || row.partNumber)
+        .map((row, index) => {
+          const original = originalSpares[index]
+          return {
+            partId: original?.partId,
+            partNumber: row.partNumber,
+            partName: row.partName,
+            vendorBatchId: original?.vendorBatchId,
+            vendorName: row.vendorName,
+            qty: safeNumber(row.qty),
+            sellingPrice: safeNumber(row.unitPrice),
+          }
+        })
+
+      await onSave({
+        labourCharge,
+        waterWash,
+        discount: safeNumber(discount),
+        paymentMode,
+        workDone,
+        sparesUsed,
+      })
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -482,7 +545,20 @@ export function JobInvoice({ job, onClose }: JobInvoiceProps) {
         </div>
 
         <div className="mt-6 flex flex-wrap justify-end gap-3 print:hidden">
+          {saveError && (
+            <div className="flex-1 text-sm text-red-400">{saveError}</div>
+          )}
           <button className="btn-outline px-4 py-2" type="button" onClick={onClose}>Close</button>
+          {onSave && (
+            <button
+              className="btn-primary px-4 py-2"
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+            >
+              {saving ? 'Saving…' : '💾 Save'}
+            </button>
+          )}
           <button className="btn-primary px-4 py-2" type="button" onClick={() => window.print()}>Print</button>
         </div>
       </div>

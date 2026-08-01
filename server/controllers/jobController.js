@@ -155,24 +155,30 @@ exports.updateJob = asyncHandler(async (req, res) => {
   ];
   allowed.forEach((f) => { if (req.body[f] !== undefined) job[f] = req.body[f]; });
 
-  if (Array.isArray(req.body.sparesUsed) && req.body.sparesUsed.length > 0) {
-    const additions = [];
+  // ── sparesUsed: full reconciliation ──────────────────────
+  // Handles additions, qty increases, qty decreases (stock restore),
+  // sellingPrice edits, and removals (items no longer in the payload).
+  if (Array.isArray(req.body.sparesUsed)) {
     const existingSpares = Array.isArray(job.sparesUsed)
       ? job.sparesUsed.filter(item => item && typeof item === 'object')
       : [];
 
+    // Build a lookup of incoming items keyed by partId|vendorBatchId
+    const incomingMap = new Map();
     for (const item of req.body.sparesUsed) {
       if (!item || !item.partId || !item.vendorBatchId) continue;
+      const key = `${item.partId.toString()}|${item.vendorBatchId.toString()}`;
+      incomingMap.set(key, item);
+    }
+
+    // Track which existing spares are still present in the payload
+    const keptKeys = new Set();
+    const merged = [];
+
+    // Process incoming items: add new or update existing (qty + sellingPrice)
+    for (const [key, item] of incomingMap) {
       const desiredQty = parseInt(item.qty, 10) || 0;
       if (desiredQty < 1) continue;
-
-      const matching = existingSpares.find(spare =>
-        spare.partId?.toString() === item.partId.toString() &&
-        spare.vendorBatchId?.toString() === item.vendorBatchId.toString()
-      );
-      const currentQty = matching?.qty || 0;
-      const delta = desiredQty - currentQty;
-      if (delta <= 0) continue;
 
       const part = await Part.findById(item.partId);
       if (!part) throw new AppError('Part not found.', 404);
@@ -181,40 +187,67 @@ exports.updateJob = asyncHandler(async (req, res) => {
       if (!batch || !batch.isActive) {
         throw new AppError(`Selected vendor batch is no longer available for part ${part.partName}.`, 400);
       }
-      if (batch.stock < delta) {
-        throw new AppError(`Not enough stock for ${part.partName}. Available: ${batch.stock}.`, 400);
+
+      const matching = existingSpares.find(spare =>
+        spare.partId?.toString() === item.partId.toString() &&
+        spare.vendorBatchId?.toString() === item.vendorBatchId.toString()
+      );
+      const currentQty = matching?.qty || 0;
+      const delta = desiredQty - currentQty;
+
+      if (delta > 0) {
+        // Qty increased — deduct additional stock
+        if (batch.stock < delta) {
+          throw new AppError(`Not enough stock for ${part.partName}. Available: ${batch.stock}.`, 400);
+        }
+        batch.stock -= delta;
+        part.lastModifiedBy = req.user.id;
+        await part.save();
+      } else if (delta < 0) {
+        // Qty decreased — restore stock difference
+        batch.stock += Math.abs(delta);
+        part.lastModifiedBy = req.user.id;
+        await part.save();
       }
 
-      batch.stock -= delta;
-      part.lastModifiedBy = req.user.id;
-      await part.save();
+      keptKeys.add(key);
 
-      additions.push({
+      // Use sellingPrice from the request if provided (allows invoice price edits),
+      // otherwise fall back to the batch's current selling price
+      const sellingPrice = Number(item.sellingPrice) > 0
+        ? Number(item.sellingPrice)
+        : (matching?.sellingPrice ?? batch.sellingPrice);
+
+      merged.push({
         partId: part._id,
         partNumber: part.partNumber,
         partName: part.partName,
         vendorBatchId: batch._id,
         vendorName: batch.vendorName,
-        sellingPrice: batch.sellingPrice,
-        qty: delta,
+        sellingPrice,
+        qty: desiredQty,
       });
     }
 
-    if (additions.length > 0) {
-      const merged = [...existingSpares];
-      for (const item of additions) {
-        const existingIndex = merged.findIndex(spare =>
-          spare.partId?.toString() === item.partId.toString() &&
-          spare.vendorBatchId?.toString() === item.vendorBatchId.toString()
-        );
-        if (existingIndex >= 0) {
-          merged[existingIndex].qty += item.qty;
-        } else {
-          merged.push(item);
+    // Process removals: items in existingSpares but not in the incoming payload
+    for (const spare of existingSpares) {
+      if (!spare.partId || !spare.vendorBatchId) continue;
+      const key = `${spare.partId.toString()}|${spare.vendorBatchId.toString()}`;
+      if (keptKeys.has(key)) continue;
+
+      // Restore full stock for removed items
+      const part = await Part.findById(spare.partId);
+      if (part) {
+        const batch = part.vendorBatches.id(spare.vendorBatchId);
+        if (batch && batch.isActive) {
+          batch.stock += Number(spare.qty) || 0;
+          part.lastModifiedBy = req.user.id;
+          await part.save();
         }
       }
-      job.sparesUsed = merged;
     }
+
+    job.sparesUsed = merged;
   }
 
   job.lastModifiedBy = req.user.id;

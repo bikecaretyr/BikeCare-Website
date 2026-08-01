@@ -225,12 +225,6 @@ export function JobsPage({ basePath, title, showBranch }: JobsPageProps) {
     }
     setSaving(true)
     try {
-      const total =
-        (+form.labourCharge || 0) +
-        (+form.waterWash || 0) +
-        sparesTotal -
-        (+form.discount || 0)
-
       const {
         paymentStatus,
         paidAmount: _paidAmount,
@@ -244,8 +238,6 @@ export function JobsPage({ basePath, title, showBranch }: JobsPageProps) {
         waterWash: +form.waterWash || 0,
         discount: +form.discount || 0,
         expectedDelivery: form.expectedDelivery || undefined,
-        sparesCost: sparesTotal,
-        totalAmount: total,
         sparesUsed: spares,
       }
       if (modal && modal !== 'new') {
@@ -572,7 +564,11 @@ export function JobsPage({ basePath, title, showBranch }: JobsPageProps) {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4">
           <JobInvoice
             job={invoiceJob}
-            onClose={() => setInvoiceJob(null)}
+            onClose={() => { setInvoiceJob(null); reloadJobs() }}
+            onSave={async (data) => {
+              await jobsApi.update(invoiceJob._id, data as unknown as Record<string, unknown>)
+              toast('Invoice saved', 'success')
+            }}
           />
         </div>
       )}
