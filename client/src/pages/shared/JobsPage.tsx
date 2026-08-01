@@ -152,7 +152,7 @@ export function JobsPage({ basePath, title, showBranch }: JobsPageProps) {
   })
 
   const openNew = () => {
-    setForm({ ...emptyForm, branch: showBranch ? userBranchId : undefined })
+    setForm({ ...emptyForm, branch: showBranch ? (userBranchId ?? '') : (userBranchId ?? undefined) })
     setSpares([])
     setSpareSearch('')
     setModal('new')
@@ -223,16 +223,22 @@ export function JobsPage({ basePath, title, showBranch }: JobsPageProps) {
       toast('Vehicle, brand and mechanic required', 'error')
       return
     }
+    if (showBranch && !form.branch) {
+      toast('Branch is required', 'error')
+      return
+    }
     setSaving(true)
     try {
       const {
         paymentStatus,
         paidAmount: _paidAmount,
+        branch: _branch,
         ...cleanForm
       } = form
 
       const body: Record<string, unknown> = {
         ...cleanForm,
+        branch: showBranch ? form.branch : (userBranchId ?? undefined),
         kmReading: form.kmReading ? +form.kmReading : undefined,
         labourCharge: +form.labourCharge || 0,
         waterWash: +form.waterWash || 0,
