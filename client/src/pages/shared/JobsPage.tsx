@@ -567,16 +567,14 @@ export function JobsPage({ basePath, title, showBranch }: JobsPageProps) {
       </Modal>
 
       {invoiceJob && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4">
-          <JobInvoice
-            job={invoiceJob}
-            onClose={() => { setInvoiceJob(null); reloadJobs() }}
-            onSave={async (data) => {
-              await jobsApi.update(invoiceJob._id, data as unknown as Record<string, unknown>)
-              toast('Invoice saved', 'success')
-            }}
-          />
-        </div>
+        <JobInvoice
+          job={invoiceJob}
+          onClose={() => { setInvoiceJob(null); reloadJobs() }}
+          onSave={async (data) => {
+            await jobsApi.update(invoiceJob._id, data as unknown as Record<string, unknown>)
+            toast('Invoice saved', 'success')
+          }}
+        />
       )}
 
       <Modal

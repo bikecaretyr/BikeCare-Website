@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { JobCard, SpareItem } from '../types'
 
 interface InvoiceSaveData {
@@ -174,39 +175,71 @@ export function JobInvoice({ job, onClose, onSave }: JobInvoiceProps) {
     }
   }
 
-  return (
+  return createPortal(
     <div id="bms-invoice-wrapper" className="fixed inset-0 z-50 overflow-y-auto bg-black/60 p-4 print:p-0">
       <style>{`
         @media print {
-          body {
-            background: white !important;
+          @page {
+            size: A4 portrait;
+            margin: 10mm 10mm 12mm 10mm;
           }
 
-          body * {
-            visibility: hidden !important;
+          html, body {
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            overflow: visible !important;
+            position: static !important;
+            background: #ffffff !important;
+            color: #111827 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
 
-          #bms-invoice-wrapper,
-          #bms-invoice-wrapper * {
-            visibility: visible !important;
+          #root {
+            display: none !important;
+          }
+
+          body > *:not(#bms-invoice-wrapper) {
+            display: none !important;
           }
 
           #bms-invoice-wrapper {
-            position: absolute !important;
-            inset: 0 !important;
+            position: static !important;
+            inset: auto !important;
+            display: block !important;
             width: 100% !important;
-            min-height: 100% !important;
-            background: white !important;
-            padding: 0 !important;
+            min-height: 0 !important;
+            height: auto !important;
+            max-height: none !important;
             overflow: visible !important;
+            background: #ffffff !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            transform: none !important;
+            box-shadow: none !important;
           }
 
           #bms-invoice {
             box-sizing: border-box !important;
+            position: static !important;
+            display: block !important;
             width: 100% !important;
-            max-width: none !important;
-            padding: 5mm !important;
-            font-size: 10px !important;
+            max-width: 100% !important;
+            min-height: 0 !important;
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            color: #111827 !important;
+            border: none !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            font-size: 11px !important;
           }
 
           #bms-invoice .overflow-x-auto {
@@ -215,65 +248,62 @@ export function JobInvoice({ job, onClose, onSave }: JobInvoiceProps) {
 
           #bms-invoice table {
             width: 100% !important;
-            min-width: 0 !important;
-            table-layout: fixed !important;
+            min-width: 100% !important;
+            max-width: 100% !important;
+            table-layout: auto !important;
+            border-collapse: collapse !important;
+            page-break-inside: auto !important;
+            break-inside: auto !important;
           }
 
-          #bms-invoice table thead {
+          #bms-invoice thead {
             display: table-header-group !important;
           }
 
-          #bms-invoice table tr {
-            break-inside: avoid !important;
-            page-break-inside: avoid !important;
+          #bms-invoice tfoot {
+            display: table-footer-group !important;
           }
 
-          #bms-invoice table th,
-          #bms-invoice table td {
+          #bms-invoice tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+
+          #bms-invoice th,
+          #bms-invoice td {
             min-width: 0 !important;
             overflow-wrap: anywhere !important;
+            word-break: break-word !important;
             white-space: normal !important;
-          }
-
-          #bms-invoice table input,
-          #bms-invoice table select {
-            box-sizing: border-box !important;
-            min-width: 0 !important;
-            width: 100% !important;
-          }
-
-          #bms-invoice .mt-8 {
-            margin-top: 10px !important;
-          }
-
-          #bms-invoice .mt-6 {
-            margin-top: 8px !important;
-          }
-
-          #bms-invoice textarea {
-            rows: 2;
-            height: 36px !important;
-          }
-
-          #bms-invoice table th,
-          #bms-invoice table td {
-            padding: 3px 4px !important;
-            font-size: 10px !important;
+            font-size: 11px !important;
+            padding: 5px 6px !important;
           }
 
           #bms-invoice input,
           #bms-invoice select,
           #bms-invoice textarea {
-            font-size: 10px !important;
+            font-size: 11px !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #111827 !important;
+            min-width: 0 !important;
+            width: 100% !important;
+            padding: 0 !important;
+          }
+
+          #bms-invoice select {
+            appearance: none !important;
+            -webkit-appearance: none !important;
+          }
+
+          #bms-invoice .invoice-break-avoid {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
 
           .no-print {
             display: none !important;
-          }
-
-          @page {
-            size: A4 portrait;
-            margin: 8mm;
           }
         }
       `}</style>
@@ -329,8 +359,9 @@ export function JobInvoice({ job, onClose, onSave }: JobInvoiceProps) {
           </div>
           <div className="space-y-2 sm:col-span-2">
             <div className="font-semibold text-gray-900">Work Done</div>
+            <div className="hidden print:block text-sm text-gray-900 whitespace-pre-wrap">{workDone || '—'}</div>
             <textarea
-              className="bg-transparent border-0 p-0 text-smborder-dashed border-gray-300 p-1 text-sm text-gray-900 focus:border-gray-600 outline-none w-full print:border-0"
+              className="print:hidden bg-transparent border border-dashed border-gray-300 p-1 text-sm text-gray-900 focus:border-gray-600 outline-none w-full"
               value={workDone}
               onChange={e => setWorkDone(e.target.value)}
               rows={1}
@@ -338,7 +369,7 @@ export function JobInvoice({ job, onClose, onSave }: JobInvoiceProps) {
           </div>
         </div>
 
-        <div className="mt-8 overflow-x-auto">
+        <div className="mt-8 overflow-x-auto print:overflow-visible">
           <div className="flex items-center justify-between mb-3">
             <div className="font-semibold text-gray-900">Services / Labour</div>
             <button type="button" className="btn-outline text-xs px-3 py-1 print:hidden" onClick={addLabourRow}>+ Add row</button>
@@ -357,14 +388,14 @@ export function JobInvoice({ job, onClose, onSave }: JobInvoiceProps) {
                   <td className="py-3 pr-3 text-gray-500">{index + 1}</td>
                   <td className="py-3 pr-3">
                     <input
-                      className="bg-transparent border-0 p-0 text-smborder-dashed border-gray-300 p-1 text-sm text-gray-900 focus:border-gray-600 outline-none w-full print:border-0"
+                      className="bg-transparent border border-dashed border-gray-300 p-1 text-sm text-gray-900 focus:border-gray-600 outline-none w-full print:border-0 print:p-0"
                       value={row.description}
                       onChange={e => updateLabour(row.id, 'description', e.target.value)}
                     />
                   </td>
                   <td className="py-3 text-right">
                     <input
-                      className="bg-transparent border-0 p-0 text-smborder-dashed border-gray-300 p-1 text-sm text-right text-gray-900 focus:border-gray-600 outline-none w-full print:border-0"
+                      className="bg-transparent border border-dashed border-gray-300 p-1 text-sm text-right text-gray-900 focus:border-gray-600 outline-none w-full print:border-0 print:p-0"
                       value={row.amount}
                       onChange={e => updateLabour(row.id, 'amount', e.target.value)}
                       type="number"
@@ -377,7 +408,7 @@ export function JobInvoice({ job, onClose, onSave }: JobInvoiceProps) {
           </table>
         </div>
 
-        <div className="mt-8 overflow-x-auto">
+        <div className="mt-8 overflow-x-auto print:overflow-visible">
           <div className="flex items-center justify-between mb-3">
             <div className="font-semibold text-gray-900">Parts Used</div>
             <button type="button" className="btn-outline text-xs px-3 py-1 print:hidden" onClick={addPartRow}>+ Add part</button>
@@ -399,21 +430,21 @@ export function JobInvoice({ job, onClose, onSave }: JobInvoiceProps) {
                   <td className="py-3 pr-3 text-gray-500">{index + 1}</td>
                   <td className="py-3 pr-3">
                     <input
-                      className="bg-transparent border-0 p-0 text-smborder-dashed border-gray-300 p-1 text-sm text-gray-900 focus:border-gray-600 outline-none w-full print:border-0"
+                      className="bg-transparent border border-dashed border-gray-300 p-1 text-sm text-gray-900 focus:border-gray-600 outline-none w-full print:border-0 print:p-0"
                       value={row.partNumber}
                       onChange={e => updatePart(row.id, 'partNumber', e.target.value)}
                     />
                   </td>
                   <td className="py-3 pr-3">
                     <input
-                      className="bg-transparent border-0 p-0 text-smborder-dashed border-gray-300 p-1 text-sm text-gray-900 focus:border-gray-600 outline-none w-full print:border-0"
+                      className="bg-transparent border border-dashed border-gray-300 p-1 text-sm text-gray-900 focus:border-gray-600 outline-none w-full print:border-0 print:p-0"
                       value={row.partName}
                       onChange={e => updatePart(row.id, 'partName', e.target.value)}
                     />
                   </td>
                   <td className="py-3 pr-3 w-24">
                     <input
-                      className="bg-transparent border-0 p-0 text-smborder-dashed border-gray-300 p-1 text-sm text-right text-gray-900 focus:border-gray-600 outline-none w-full print:border-0"
+                      className="bg-transparent border border-dashed border-gray-300 p-1 text-sm text-right text-gray-900 focus:border-gray-600 outline-none w-full print:border-0 print:p-0"
                       type="number"
                       min="0"
                       value={row.qty}
@@ -422,7 +453,7 @@ export function JobInvoice({ job, onClose, onSave }: JobInvoiceProps) {
                   </td>
                   <td className="py-3 pr-3 w-32">
                     <input
-                      className="bg-transparent border-0 p-0 text-smborder-dashed border-gray-300 p-1 text-sm text-right text-gray-900 focus:border-gray-600 outline-none w-full print:border-0"
+                      className="bg-transparent border border-dashed border-gray-300 p-1 text-sm text-right text-gray-900 focus:border-gray-600 outline-none w-full print:border-0 print:p-0"
                       type="number"
                       min="0"
                       value={row.unitPrice}
@@ -436,14 +467,14 @@ export function JobInvoice({ job, onClose, onSave }: JobInvoiceProps) {
           </table>
         </div>
 
-        <div className="mt-8 grid gap-2 sm:grid-cols-[1fr_220px]">
+        <div className="mt-8 grid gap-2 sm:grid-cols-[1fr_220px] invoice-break-avoid">
           <div className="space-y-3 text-sm text-gray-700">
             <div className="font-semibold text-gray-900">Payment</div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <div className="text-xs text-gray-500">Payment Mode</div>
                 <select
-                  className="bg-transparent border-0 p-0 text-smborder-dashed border-gray-300 p-1 text-sm text-gray-900 focus:border-gray-600 outline-none w-full print:border-0"
+                  className="bg-transparent border border-dashed border-gray-300 p-1 text-sm text-gray-900 focus:border-gray-600 outline-none w-full print:border-0 print:p-0"
                   value={paymentMode}
                   onChange={e => setPaymentMode(e.target.value as JobCard['paymentMode'])}
                 >
@@ -507,7 +538,7 @@ export function JobInvoice({ job, onClose, onSave }: JobInvoiceProps) {
             <div className="flex justify-between py-1 items-center">
               <span>Discount:</span>
               <input
-                className="bg-transparent border-0 p-0 text-smborder-dashed border-gray-300 p-1 text-sm text-right text-gray-900 focus:border-gray-600 outline-none w-24 print:border-0"
+                className="bg-transparent border border-dashed border-gray-300 p-1 text-sm text-right text-gray-900 focus:border-gray-600 outline-none w-24 print:border-0 print:p-0"
                 type="number"
                 min="0"
                 value={discount}
@@ -521,12 +552,12 @@ export function JobInvoice({ job, onClose, onSave }: JobInvoiceProps) {
           </div>
         </div>
         {job.paymentHistory?.length > 0 && (
-          <div className="mt-6">
+          <div className="mt-6 invoice-break-avoid">
             <div className="mb-3 font-semibold text-gray-900">
               Payment History
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <div className="overflow-x-auto rounded-xl border border-gray-200 print:overflow-visible">
               <table className="min-w-full text-sm text-gray-700">
                 <thead className="bg-gray-50">
                   <tr>
@@ -562,7 +593,7 @@ export function JobInvoice({ job, onClose, onSave }: JobInvoiceProps) {
             </div>
           </div>
         )}
-        <div className="mt-8 space-y-4 text-sm text-gray-700">
+        <div className="mt-8 space-y-4 text-sm text-gray-700 invoice-break-avoid">
           <div>Thank you for choosing Balaji Motors!</div>
           <div>{branch?.whatsapp ? `WhatsApp: ${branch.whatsapp}` : branch?.phone ? `Phone: ${branch.phone}` : ''}</div>
           <div className="flex flex-col gap-6 pt-6 sm:flex-row sm:items-end sm:justify-between">
@@ -595,6 +626,7 @@ export function JobInvoice({ job, onClose, onSave }: JobInvoiceProps) {
           <button className="btn-primary px-4 py-2" type="button" onClick={() => window.print()}>Print</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
