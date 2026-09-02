@@ -203,8 +203,6 @@ export function JobInvoice({ job, onClose, onSave }: JobInvoiceProps) {
 
           #bms-invoice {
             width: 194mm !important;
-            max-height: 281mm !important;
-            overflow: hidden !important;
             padding: 5mm !important;
             font-size: 10px !important;
           }
