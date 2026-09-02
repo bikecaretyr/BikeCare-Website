@@ -202,9 +202,44 @@ export function JobInvoice({ job, onClose, onSave }: JobInvoiceProps) {
           }
 
           #bms-invoice {
-            width: 194mm !important;
+            box-sizing: border-box !important;
+            width: 100% !important;
+            max-width: none !important;
             padding: 5mm !important;
             font-size: 10px !important;
+          }
+
+          #bms-invoice .overflow-x-auto {
+            overflow: visible !important;
+          }
+
+          #bms-invoice table {
+            width: 100% !important;
+            min-width: 0 !important;
+            table-layout: fixed !important;
+          }
+
+          #bms-invoice table thead {
+            display: table-header-group !important;
+          }
+
+          #bms-invoice table tr {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+
+          #bms-invoice table th,
+          #bms-invoice table td {
+            min-width: 0 !important;
+            overflow-wrap: anywhere !important;
+            white-space: normal !important;
+          }
+
+          #bms-invoice table input,
+          #bms-invoice table select {
+            box-sizing: border-box !important;
+            min-width: 0 !important;
+            width: 100% !important;
           }
 
           #bms-invoice .mt-8 {
@@ -486,7 +521,7 @@ export function JobInvoice({ job, onClose, onSave }: JobInvoiceProps) {
           </div>
         </div>
         {job.paymentHistory?.length > 0 && (
-          <div className="mt-6 print:hidden">
+          <div className="mt-6">
             <div className="mb-3 font-semibold text-gray-900">
               Payment History
             </div>
