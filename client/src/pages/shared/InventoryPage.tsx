@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { parts as partsApi, vendors as vendorsApi, purchases as purchasesApi, branches as branchesApi } from '../../api/client'
 import { Spinner, Table, Tr, Td, Modal, FormGrid, Field, FormActions, toast, StatusBadge, fmtDate } from '../../components/ui'
 import { useConfirm } from '../../hooks/useConfirm'
@@ -6,11 +6,95 @@ import { useData } from '../../hooks/useData'
 import { useForm } from '../../hooks/useForm'
 import type { Branch, Part, PurchaseEntry, Purchase, Vendor, VendorBatch } from '../../types'
 
+// ── SearchSelect Component (with proper UX) ────────────────
+interface SearchSelectProps {
+  value: string
+  onChange: (value: string) => void
+  options: Array<{ value: string; label: string }>
+  placeholder?: string
+  className?: string
+}
+
+function SearchSelect({ value, onChange, options, placeholder = 'Search...', className = '' }: SearchSelectProps) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+        setSearch('')
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const filtered = options.filter(opt => opt.label.toLowerCase().includes(search.toLowerCase()))
+  const selected = options.find(opt => opt.value === value)
+
+  return (
+    <div ref={ref} className={`relative ${className}`}>
+      <input
+        type="text"
+        className={`input text-xs w-full pr-7 transition-all ${
+          selected 
+            ? 'bg-green-500/10 border-green-500/40 text-green-400 font-medium' 
+            : 'bg-surface border-border text-gray-400'
+        }`}
+        placeholder={selected ? selected.label : placeholder}
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        onFocus={() => setOpen(true)}
+        autoComplete="off"
+      />
+      <div className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-xs transition-colors ${
+        selected ? 'text-green-400' : 'text-gray-500'
+      }`}>▼</div>
+      {open && (
+        <div className="fixed z-[9999] bg-surface border border-border rounded-lg shadow-xl max-h-60 overflow-auto min-w-[200px]"
+          style={{
+            top: ref.current ? `${ref.current.getBoundingClientRect().bottom + 4}px` : 0,
+            left: ref.current ? `${ref.current.getBoundingClientRect().left}px` : 0,
+            width: ref.current ? `${ref.current.offsetWidth}px` : 'auto'
+          }}>
+          {filtered.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-gray-500">No matches</div>
+          ) : (
+            filtered.map(opt => (
+              <div
+                key={opt.value}
+                className={`px-3 py-2 text-xs cursor-pointer transition-colors ${
+                  opt.value === value 
+                    ? 'bg-green-500/20 text-green-300 font-semibold' 
+                    : 'text-gray-200 hover:bg-surface-2'
+                }`}
+                onClick={() => {
+                  onChange(opt.value)
+                  setSearch('')
+                  setOpen(false)
+                }}
+              >
+                {opt.label}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 type Tab = 'parts' | 'vendors' | 'purchases'
 
 type PartForm = { partNumber: string; partName: string; brand: string; branch?: string; minStock: string }
 type VendorForm = { name: string; phone: string; paymentDueDays: string; vehicleModels: string; branches: string[] }
 type PurchaseForm = { vendorId: string; qty: string; purchasePrice: string; sellingPrice: string; notes: string }
+
+type BulkItem = { partId: string; qty: string; purchaseCost: string; sellingPrice: string }
+const emptyBulkItem = (): BulkItem => ({ partId: '', qty: '1', purchaseCost: '', sellingPrice: '' })
+type BulkPurchaseForm = { vendorId: string; items: BulkItem[]; miscCost: string; notes: string; paymentDueDate: string }
 
 interface InventoryPageProps {
   title: string
@@ -27,6 +111,10 @@ export function InventoryPage({ title, showVendorTab, showBranch }: InventoryPag
   const [vendorModal, setVendorModal] = useState<Vendor | 'new' | null>(null)
   const [batchDetail, setBatchDetail] = useState<Part | null>(null)
   const [saving, setSaving] = useState(false)
+  const [bulkModal, setBulkModal] = useState(false)
+  const [bulkForm, setBulkForm] = useState<BulkPurchaseForm>({ vendorId: '', items: [emptyBulkItem()], miscCost: '0', notes: '', paymentDueDate: '' })
+  const [bulkNewPart, setBulkNewPart] = useState<{ idx: number } | null>(null)
+  const [bulkNewPartForm, setBulkNewPartForm] = useState({ partNumber: '', partName: '', brand: '' })
 
   const { confirm, ConfirmDialog } = useConfirm()
 
@@ -162,6 +250,95 @@ export function InventoryPage({ title, showVendorTab, showBranch }: InventoryPag
     }
   }
 
+  // ── Bulk Purchase ────────────────────────────────────────
+  const openBulkModal = () => {
+    setBulkForm({ vendorId: '', items: [emptyBulkItem()], miscCost: '0', notes: '', paymentDueDate: '' })
+    setBulkModal(true)
+  }
+
+  const setBulkField = <K extends keyof BulkPurchaseForm>(key: K, value: BulkPurchaseForm[K]) =>
+    setBulkForm(prev => ({ ...prev, [key]: value }))
+
+  const setBulkItemField = (idx: number, key: keyof BulkItem, value: string) =>
+    setBulkForm(prev => ({
+      ...prev,
+      items: prev.items.map((item, i) => (i === idx ? { ...item, [key]: value } : item)),
+    }))
+
+  const addBulkItem = () => setBulkForm(prev => ({ ...prev, items: [...prev.items, emptyBulkItem()] }))
+
+  const removeBulkItem = (idx: number) =>
+    setBulkForm(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== idx) }))
+
+  const bulkItemsCost = bulkForm.items.reduce((sum, item) => sum + (+item.purchaseCost || 0) * (+item.qty || 0), 0)
+  const bulkTotalCost = bulkItemsCost + (+bulkForm.miscCost || 0)
+
+  const saveBulkPurchase = async () => {
+    if (!bulkForm.vendorId) { toast('Select a vendor', 'error'); return }
+    const validItems = bulkForm.items.filter(i => i.partId && +i.qty >= 1 && +i.sellingPrice > 0)
+    if (validItems.length === 0) { toast('Add at least one valid item with part, quantity and selling price', 'error'); return }
+
+    setSaving(true)
+    try {
+      await purchasesApi.create({
+        vendorId: bulkForm.vendorId,
+        items: validItems.map(i => ({
+          partId: i.partId,
+          qty: +i.qty,
+          purchaseCost: +i.purchaseCost || 0,
+          sellingPrice: +i.sellingPrice,
+        })),
+        miscCost: +bulkForm.miscCost || 0,
+        totalCost: bulkTotalCost,
+        paymentDueDate: bulkForm.paymentDueDate || undefined,
+        notes: bulkForm.notes || undefined,
+      })
+      toast(`Bulk purchase of ${validItems.length} item(s) saved — stock updated`, 'success')
+      setBulkModal(false)
+      await Promise.all([loadParts(), loadPurchases()])
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : 'Bulk purchase failed', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ── Inline New Part (from Bulk Purchase) ─────────────────
+  const openBulkNewPart = (idx: number) => {
+    setBulkNewPartForm({ partNumber: '', partName: '', brand: '' })
+    setBulkNewPart({ idx })
+  }
+
+  const saveBulkNewPart = async () => {
+    if (!bulkNewPartForm.partNumber || !bulkNewPartForm.partName) {
+      toast('Part number and name are required', 'error')
+      return
+    }
+    setSaving(true)
+    try {
+      const created = await partsApi.create({
+        partNumber: bulkNewPartForm.partNumber.toUpperCase().trim(),
+        partName: bulkNewPartForm.partName,
+        brand: bulkNewPartForm.brand,
+        minStock: 5,
+      })
+      // Refresh parts list so the new part shows in dropdowns
+      await loadParts()
+      // Auto-select the new part in the row that triggered it
+      if (bulkNewPart && created.part) {
+        setBulkItemField(bulkNewPart.idx, 'partId', created.part._id)
+        toast(`Part ${bulkNewPartForm.partNumber} created and selected`, 'success')
+      } else {
+        toast(created.message || 'Part request submitted for approval', 'warn')
+      }
+      setBulkNewPart(null)
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : 'Failed to create part', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const confirmDeletePart = async (part: Part) => {
     const confirmed = await confirm({
       title: 'Remove part?',
@@ -227,6 +404,7 @@ export function InventoryPage({ title, showVendorTab, showBranch }: InventoryPag
         <div className="flex gap-2">
           {tab === 'parts' && <button className="btn-primary text-xs" onClick={() => { setPartForm({ partNumber: '', partName: '', brand: '', branch: branches[0]?._id || '', minStock: '5' }); setPartModal('new') }}>+ New Part</button>}
           {showVendorTab && tab === 'vendors' && <button className="btn-primary text-xs" onClick={() => { setVendorForm({ name: '', phone: '', paymentDueDays: '30', vehicleModels: '', branches: [] }); setVendorModal('new') }}>+ New Vendor</button>}
+          {tab === 'purchases' && <button className="btn-primary text-xs" onClick={openBulkModal}>+ Bulk Purchase</button>}
         </div>
       </div>
 
@@ -410,6 +588,121 @@ export function InventoryPage({ title, showVendorTab, showBranch }: InventoryPag
         <FormActions>
           <button className="btn-outline" onClick={() => setPurchaseModal(null)}>Cancel</button>
           <button className="btn-primary" onClick={savePurchase} disabled={saving}>{saving ? <Spinner size="sm" /> : 'Save'}</button>
+        </FormActions>
+      </Modal>
+
+      {/* ── Bulk Purchase Modal ───────────────────────────────── */}
+      <Modal open={bulkModal} onClose={() => setBulkModal(false)} title="Bulk Purchase — Multiple Parts from One Vendor" wide>
+        <div className="space-y-4">
+          {/* Vendor & meta */}
+          <FormGrid cols={3}>
+            <Field label="Vendor" required>
+              <select className="input" value={bulkForm.vendorId} onChange={e => setBulkField('vendorId', e.target.value)}>
+                <option value="">Select vendor</option>
+                {vendorList.map(v => <option key={v._id} value={v._id}>{v.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Payment Due Date">
+              <input className="input" type="date" value={bulkForm.paymentDueDate} onChange={e => setBulkField('paymentDueDate', e.target.value)} />
+            </Field>
+            <Field label="Misc / Transport Cost">
+              <input className="input" type="number" min="0" value={bulkForm.miscCost} onChange={e => setBulkField('miscCost', e.target.value)} />
+            </Field>
+          </FormGrid>
+
+          {/* Items table */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-gray-200">Purchase Items</h3>
+              <button className="btn-outline text-xs px-2 py-1" onClick={addBulkItem}>+ Add Item</button>
+            </div>
+            <div className="border border-border rounded-xl overflow-hidden">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-surface-2 text-gray-400 text-left">
+                    <th className="px-3 py-2 w-[35%]">Part</th>
+                    <th className="px-3 py-2 w-[15%]">Qty</th>
+                    <th className="px-3 py-2 w-[18%]">Purchase ₹</th>
+                    <th className="px-3 py-2 w-[18%]">Selling ₹</th>
+                    <th className="px-3 py-2 w-[10%] text-right">Subtotal</th>
+                    <th className="px-3 py-2 w-[4%]"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bulkForm.items.map((item, idx) => (
+                    <tr key={idx} className="border-t border-border">
+                      <td className="px-3 py-2">
+                        <div className="flex gap-1">
+                          <SearchSelect
+                            value={item.partId}
+                            onChange={val => setBulkItemField(idx, 'partId', val)}
+                            options={partList.map(p => ({ value: p._id, label: `${p.partNumber} — ${p.partName}` }))}
+                            placeholder="Type to search parts..."
+                            className="flex-1"
+                          />
+                          <button type="button" className="btn-outline px-1.5 py-0.5 text-[10px] whitespace-nowrap shrink-0" onClick={() => openBulkNewPart(idx)} title="Add new part">+ New</button>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <input className="input text-xs" type="number" min="1" value={item.qty} onChange={e => setBulkItemField(idx, 'qty', e.target.value)} />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input className="input text-xs" type="number" min="0" value={item.purchaseCost} onChange={e => setBulkItemField(idx, 'purchaseCost', e.target.value)} placeholder="0" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input className="input text-xs" type="number" min="0" value={item.sellingPrice} onChange={e => setBulkItemField(idx, 'sellingPrice', e.target.value)} placeholder="0" />
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-300 font-mono">
+                        ₹{((+item.purchaseCost || 0) * (+item.qty || 0)).toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2">
+                        {bulkForm.items.length > 1 && (
+                          <button className="text-red-400 hover:text-red-300 text-base leading-none" onClick={() => removeBulkItem(idx)} title="Remove item">×</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <Field label="Notes" span>
+            <input className="input" value={bulkForm.notes} onChange={e => setBulkField('notes', e.target.value)} placeholder="Optional purchase notes" />
+          </Field>
+
+          {/* Totals summary */}
+          <div className="bg-surface-2 rounded-xl p-3 flex flex-wrap gap-6 text-sm">
+            <div><span className="text-gray-400">Items cost:</span> <span className="font-mono text-gray-100">₹{bulkItemsCost.toLocaleString()}</span></div>
+            <div><span className="text-gray-400">Misc cost:</span> <span className="font-mono text-gray-100">₹{(+bulkForm.miscCost || 0).toLocaleString()}</span></div>
+            <div className="font-bold"><span className="text-amber">Total:</span> <span className="font-mono text-amber">₹{bulkTotalCost.toLocaleString()}</span></div>
+            <div><span className="text-gray-400">Items:</span> <span className="font-mono text-gray-100">{bulkForm.items.filter(i => i.partId).length}</span></div>
+          </div>
+        </div>
+        <FormActions>
+          <button className="btn-outline" onClick={() => setBulkModal(false)}>Cancel</button>
+          <button className="btn-primary" onClick={saveBulkPurchase} disabled={saving}>{saving ? <Spinner size="sm" /> : 'Save Bulk Purchase'}</button>
+        </FormActions>
+      </Modal>
+
+      {/* ── Inline New Part Modal (from Bulk Purchase) ────────── */}
+      <Modal open={!!bulkNewPart} onClose={() => setBulkNewPart(null)} title="Quick Add Part">
+        <p className="text-xs text-gray-400 mb-3">Create a new part to add to this bulk purchase. It will be auto-selected in the item row.</p>
+        <FormGrid>
+          <Field label="Part Number" required>
+            <input className="input uppercase" value={bulkNewPartForm.partNumber} onChange={e => setBulkNewPartForm(prev => ({ ...prev, partNumber: e.target.value.toUpperCase() }))} placeholder="e.g. BRK-PAD-001" />
+          </Field>
+          <Field label="Part Name" required>
+            <input className="input" value={bulkNewPartForm.partName} onChange={e => setBulkNewPartForm(prev => ({ ...prev, partName: e.target.value }))} placeholder="e.g. Front Brake Pad" />
+          </Field>
+          <Field label="Brand" span>
+            <input className="input" value={bulkNewPartForm.brand} onChange={e => setBulkNewPartForm(prev => ({ ...prev, brand: e.target.value }))} placeholder="Optional" />
+          </Field>
+        </FormGrid>
+        <FormActions>
+          <button className="btn-outline" onClick={() => setBulkNewPart(null)}>Cancel</button>
+          <button className="btn-primary" onClick={saveBulkNewPart} disabled={saving}>{saving ? <Spinner size="sm" /> : 'Create & Select'}</button>
         </FormActions>
       </Modal>
 

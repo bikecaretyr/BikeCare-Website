@@ -58,6 +58,8 @@ app.use(
     "https://bikecaretyr.in",
     "https://www.bikecaretyr.in",
     'http://localhost:5000',
+    'http://localhost:5173',
+    'http://localhost:5174',
     process.env.CLIENT_URL
     ],
     credentials: true,
