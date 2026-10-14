@@ -33,6 +33,20 @@ connectDB();
 
 const app = express();
 
+const allowedOrigins = [
+  'https://bikecaretyr.in',
+  'https://www.bikecaretyr.in',
+  'http://localhost:5000',
+  'http://localhost:5173',
+  'http://localhost:5174',
+].concat(
+  (process.env.CLIENT_URL || '')
+    .split(/[\n,|]+/)
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .filter((value) => value.startsWith('http://') || value.startsWith('https://'))
+);
+
 // ── Security Headers ─────────────────────────────────────
 app.use(
   helmet({
@@ -54,14 +68,14 @@ app.use(
 // ── CORS ─────────────────────────────────────────────────
 app.use(
   cors({
-    origin: [
-    "https://bikecaretyr.in",
-    "https://www.bikecaretyr.in",
-    'http://localhost:5000',
-    'http://localhost:5173',
-    'http://localhost:5174',
-    process.env.CLIENT_URL
-    ],
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

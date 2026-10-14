@@ -35,21 +35,25 @@ const generateResetToken = () => {
 };
 
 const setRefreshCookie = (res, token) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+
   res.cookie('bms_refresh', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    path: '/api/auth/refresh',
+    path: '/',
   });
 };
 
 const clearRefreshCookie = (res) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+
   res.clearCookie('bms_refresh', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    path: '/api/auth/refresh',
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    path: '/',
   });
 };
 
