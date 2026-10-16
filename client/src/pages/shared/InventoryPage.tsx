@@ -115,6 +115,7 @@ export function InventoryPage({ title, showVendorTab, showBranch }: InventoryPag
   const [bulkForm, setBulkForm] = useState<BulkPurchaseForm>({ vendorId: '', items: [emptyBulkItem()], miscCost: '0', notes: '', paymentDueDate: '' })
   const [bulkNewPart, setBulkNewPart] = useState<{ idx: number } | null>(null)
   const [bulkNewPartForm, setBulkNewPartForm] = useState({ partNumber: '', partName: '', brand: '' })
+  const [viewPurchase, setViewPurchase] = useState<PurchaseEntry | Purchase | null>(null)
 
   const { confirm, ConfirmDialog } = useConfirm()
 
@@ -525,7 +526,7 @@ export function InventoryPage({ title, showVendorTab, showBranch }: InventoryPag
                     <Td>{entry.paymentDueDate ? fmtDate(entry.paymentDueDate) : '—'}</Td>
                     <Td>{entry.paymentPaid ? 'Yes' : 'No'}</Td>
                     <Td>
-                      <button className="btn-outline px-2 py-1 text-[10px]" onClick={() => {}}>View</button>
+                      <button className="btn-outline px-2 py-1 text-[10px]" onClick={() => setViewPurchase(entry)}>View</button>
                     </Td>
                   </Tr>
                 )
@@ -754,6 +755,154 @@ export function InventoryPage({ title, showVendorTab, showBranch }: InventoryPag
           </FormActions>
         </Modal>
       )}
+
+      {/* Purchase Detail Modal */}
+      {viewPurchase && (() => {
+        const isBulk = 'items' in viewPurchase
+        const handleMarkPaid = async () => {
+          try {
+            await purchasesApi.markPaid(viewPurchase._id)
+            toast('Marked as paid', 'success')
+            setViewPurchase(null)
+            reloadPurchases()
+          } catch (err: any) {
+            toast(err.message || 'Failed to mark as paid', 'error')
+          }
+        }
+
+        return (
+          <Modal open={true} onClose={() => setViewPurchase(null)} title="Purchase Details" wide>
+            <div className="space-y-4">
+              {/* Basic Info */}
+              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-border">
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Type</div>
+                  <div className="text-sm font-medium">{isBulk ? 'Bulk Purchase' : 'Single Purchase'}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Vendor</div>
+                  <div className="text-sm">{typeof viewPurchase.vendor === 'object' ? viewPurchase.vendor.name : viewPurchase.vendor}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Payment Due Date</div>
+                  <div className="text-sm">{viewPurchase.paymentDueDate ? fmtDate(viewPurchase.paymentDueDate) : '—'}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Payment Status</div>
+                  <StatusBadge status={viewPurchase.paymentPaid ? 'Active' : 'Inactive'} />
+                </div>
+              </div>
+
+              {/* Items */}
+              {isBulk ? (
+                <div>
+                  <div className="text-xs font-medium text-gray-400 mb-2">Items ({viewPurchase.items.length})</div>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {viewPurchase.items.map((item, idx) => {
+                      const pid = item.partId
+                      const partObj = typeof pid === 'object' && pid !== null ? pid as unknown as Part : null
+                      const partFromList = typeof pid === 'string' ? parts?.find(p => p._id === pid) : null
+                      const partDisplay = partObj
+                        ? `${partObj.partName} (${partObj.partNumber})`
+                        : partFromList
+                          ? `${partFromList.partName} (${partFromList.partNumber})`
+                          : String(pid)
+                      return (
+                        <div key={idx} className="bg-surface/50 rounded-lg p-3 border border-border">
+                          <div className="grid grid-cols-4 gap-3 text-xs">
+                            <div>
+                              <div className="text-gray-500 mb-1">Part</div>
+                              <div className="font-medium">{partDisplay}</div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500 mb-1">Quantity</div>
+                              <div>{item.qty}</div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500 mb-1">Purchase Cost</div>
+                              <div>₹{item.purchaseCost}</div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500 mb-1">Selling Price</div>
+                              <div>₹{item.sellingPrice}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <div className="text-gray-500 text-xs mb-1">Misc Cost</div>
+                        <div className="font-medium">₹{viewPurchase.miscCost || 0}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500 text-xs mb-1">Total Items</div>
+                        <div className="font-medium">{viewPurchase.items.reduce((sum, item) => sum + item.qty, 0)}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500 text-xs mb-1">Total Cost</div>
+                        <div className="font-medium text-primary">₹{viewPurchase.totalCost}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="text-xs font-medium text-gray-400 mb-2">Part Details</div>
+                  <div className="bg-surface/50 rounded-lg p-4 border border-border">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <div className="text-gray-500 text-xs mb-1">Part</div>
+                        <div className="font-medium">
+                          {typeof viewPurchase.part === 'object' 
+                            ? `${viewPurchase.part.partName} (${viewPurchase.part.partNumber})`
+                            : viewPurchase.part}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500 text-xs mb-1">Quantity</div>
+                        <div>{viewPurchase.qty}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500 text-xs mb-1">Purchase Price (per unit)</div>
+                        <div>₹{viewPurchase.purchasePrice}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500 text-xs mb-1">Selling Price (per unit)</div>
+                        <div>₹{viewPurchase.sellingPrice}</div>
+                      </div>
+                      <div className="col-span-2">
+                        <div className="text-gray-500 text-xs mb-1">Total Cost</div>
+                        <div className="font-medium text-primary">₹{viewPurchase.purchasePrice * viewPurchase.qty}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Notes */}
+              {viewPurchase.notes && (
+                <div>
+                  <div className="text-xs font-medium text-gray-400 mb-2">Notes</div>
+                  <div className="bg-surface/50 rounded-lg p-3 border border-border text-sm text-gray-300">
+                    {viewPurchase.notes}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex justify-end gap-2 pt-4 border-t border-border">
+                <button className="btn-outline" onClick={() => setViewPurchase(null)}>Close</button>
+                {!viewPurchase.paymentPaid && (
+                  <button className="btn-primary" onClick={handleMarkPaid}>Mark as Paid</button>
+                )}
+              </div>
+            </div>
+          </Modal>
+        )
+      })()}
 
       {ConfirmDialog}
     </div>
